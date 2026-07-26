@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Logic Simulator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', monospace, sans-serif;
+            background-color: #0f111a;
+            color: #a6accd;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { color: #8034a0; margin-bottom: 20px; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .panel {
+            background: #1a1c2a;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            border: 1px solid #282a3a;
+        }
+
+        .controls { width: 280px; }
+        .analyzer { flex-grow: 1; }
+
+        label { display: block; margin: 12px 0 5px; color: #82aaff; font-weight: bold; }
+        select, button {
+            width: 100%;
+            padding: 10px;
+            background: #282a3a;
+            color: #fff;
+            border: 1px solid #444a68;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button {
+            background: #7c3aed;
+            margin-top: 10px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { background: #6d28d9; }
+
+        .toggle-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333; transition: .3s; border-radius: 22px;
+        }
+
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+            background-color: white; transition: .3s; border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: #10b981; }
+        input:checked + .slider:before { transform: translateX(22px); }
+
+        canvas {
+            background: #12131f;
+            border-radius: 6px;
+            border: 1px solid #282a3a;
+            display: block;
+        }
+
+        .recording-indicator {
+            display: none;
+            color: #ef4444;
+            font-weight: bold;
+            margin-top: 5px;
+            text-align: center;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>DIGITAL LOGIC TIMING ANALYZER</h1>
+
+    <div class="container">
+        <div class="panel controls">
+            <label for="modeSelect">Circuit Mode</label>
+            <select id="modeSelect" onchange="changeMode()">
+                <option value="0">Basic Logic Gates</option>
+                <option value="1">D Flip-Flop</option>
+                <option value="2">JK Flip-Flop</option>
+                <option value="3">T Flip-Flop</option>
+                <option value="4">SR Flip-Flop</option>
+                <option value="5">Half Adder</option>
+                <option value="6">2:1 Multiplexer</option>
+            </select>
+
+            <hr style="border-color: #282a3a; margin: 15px 0;">
+
+            <div class="toggle-group">
+                <span id="lblA">INPUT A (J/D/T/S)</span>
+                <label class="switch">
+                    <input type="checkbox" id="inputA" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="toggle-group">
+                <span id="lblB">INPUT B (K/R)</span>
+                <label class="switch">
+                    <input type="checkbox" id="inputB" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <button onclick="stepClock()">⚡ Step Clock Cycle</button>
+            <button id="autoBtn" onclick="toggleAutoClock()" style="background: #10b981;">▶ Run Continuous Clock</button>
+            <button onclick="resetSimulation()" style="background: #ef4444;">🔄 Reset</button>
+
+            <hr style="border-color: #282a3a; margin: 15px 0;">
+
+            <!-- CANVAS RECORDER BUTTONS -->
+            <button id="recordBtn" onclick="toggleRecordCanvas()" style="background: #0284c7;">🔴 Start Recording Video</button>
+            <div id="recIndicator" class="recording-indicator">⏺ RECORDING CANVAS...</div>
+        </div>
+
+        <div class="panel analyzer">
+            <canvas id="timingCanvas" width="700" height="450"></canvas>
+        </div>
+    </div>
+
+    <script src="engine.js"></script>
+
+    <script>
+        let isWasmReady = false;
+        let autoClockTimer = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        const MAX_CYCLES = 20;
+
+        const signalNames = {
+            0: ["IN_A", "IN_B", "CLK (Square)", "OUT_AND", "OUT_OR", "OUT_XOR", "OUT_NAND"],
+            1: ["D_IN", "UNUSED", "CLK (Square)", "OUT_Q", "OUT_Q_BAR"],
+            2: ["J_IN", "K_IN", "CLK (Square)", "OUT_Q", "OUT_Q_BAR"],
+            3: ["T_IN", "UNUSED", "CLK (Square)", "OUT_Q", "OUT_Q_BAR"],
+            4: ["S_IN", "R_IN", "CLK (Square)", "OUT_Q", "OUT_Q_BAR"],
+            5: ["IN_A", "IN_B", "CLK (Square)", "SUM", "CARRY"],
+            6: ["IN_A", "IN_B", "SEL (Square)", "OUT_MUX"]
+        };
+
+        const signalColors = ["#38bdf8", "#38bdf8", "#f59e0b", "#10b981", "#a855f7", "#10b981", "#ef4444"];
+
+        Module['onRuntimeInitialized'] = function() {
+            isWasmReady = true;
+            resetSimulation();
+        };
+
+        function stepClock() {
+            if (!isWasmReady) return;
+
+            const sigA = document.getElementById('inputA').checked ? 1 : 0;
+            const sigB = document.getElementById('inputB').checked ? 1 : 0;
+
+            Module._simulate_step(sigA, sigB, 0);
+            drawWaveforms();
+        }
+
+        function toggleAutoClock() {
+            const btn = document.getElementById('autoBtn');
+            if (autoClockTimer) {
+                clearInterval(autoClockTimer);
+                autoClockTimer = null;
+                btn.innerText = "▶ Run Continuous Clock";
+                btn.style.background = "#10b981";
+            } else {
+                autoClockTimer = setInterval(stepClock, 300);
+                btn.innerText = "⏸ Pause Clock";
+                btn.style.background = "#f59e0b";
+            }
+        }
+
+        function changeMode() {
+            resetSimulation();
+        }
+
+        function resetSimulation() {
+            if (!isWasmReady) return;
+            if (autoClockTimer) toggleAutoClock();
+            
+            const mode = parseInt(document.getElementById('modeSelect').value);
+            Module._set_circuit_mode(mode);
+            
+            stepClock();
+            stepClock();
+        }
+
+        /* ---------------- CANVAS RECORDER FEATURE ---------------- */
+        function toggleRecordCanvas() {
+            const btn = document.getElementById('recordBtn');
+            const recIndicator = document.getElementById('recIndicator');
+            const canvas = document.getElementById('timingCanvas');
+
+            if (!isRecording) {
+                recordedChunks = [];
+                const stream = canvas.captureStream(30); // Capture Canvas at 30 FPS
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+
+                mediaRecorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = function() {
+                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'logic_analyzer_output.webm';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.innerText = "⏹ Stop & Download Recording";
+                btn.style.background = "#dc2626";
+                recIndicator.style.display = "block";
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                btn.innerText = "🔴 Start Recording Video";
+                btn.style.background = "#0284c7";
+                recIndicator.style.display = "none";
+            }
+        }
+
+        /* ---------------- WAVEFORM RENDERING ---------------- */
+        function drawWaveforms() {
+            const canvas = document.getElementById('timingCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const currentMode = parseInt(document.getElementById('modeSelect').value);
+            const activeSignals = signalNames[currentMode];
+            const totalSteps = Module._get_current_step();
+
+            const rowHeight = canvas.height / activeSignals.length;
+            const stepWidth = (canvas.width - 130) / MAX_CYCLES;
+            const startX = 120;
+
+            for (let i = 0; i < activeSignals.length; i++) {
+                const yCenter = i * rowHeight + rowHeight / 2;
+
+                // Signal Label
+                ctx.fillStyle = signalColors[i] || "#ffffff";
+                ctx.font = "12px monospace";
+                ctx.fillText(activeSignals[i], 10, yCenter + 4);
+
+                // Grid base line
+                ctx.strokeStyle = "#282a3a";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(startX, yCenter + 12);
+                ctx.lineTo(canvas.width - 10, yCenter + 12);
+                ctx.stroke();
+
+                // Signal Waveform
+                ctx.strokeStyle = signalColors[i] || "#10b981";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+
+                let lastVal = 0;
+                for (let step = 0; step < totalSteps; step++) {
+                    const val = Module._get_history_value(step, i);
+
+                    const x = startX + step * stepWidth;
+                    const yLow = yCenter + 12;
+                    const yHigh = yCenter - 12;
+                    const currentY = val ? yHigh : yLow;
+
+                    if (step === 0) {
+                        ctx.moveTo(x, currentY);
+                    } else {
+                        const prevY = lastVal ? yHigh : yLow;
+                        ctx.lineTo(x, prevY);
+                        ctx.lineTo(x, currentY);
+                    }
+                    ctx.lineTo(x + stepWidth, currentY);
+                    lastVal = val;
+                }
+                ctx.stroke();
+            }
+        }
+    </script>
+</body>
+</html>
