@@ -108,4 +108,4 @@ Open your web browser and go to:
 
 Plaintext
 http://localhost:8000
-<img width="1588" height="818" alt="image" src="https://github.com/user-attachments/assets/a24bb1fc-f70f-4074-b380-bdecbc3136f9" />
+
