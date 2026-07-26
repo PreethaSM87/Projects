@@ -100,7 +100,7 @@ Option B: Run WebAssembly Web Interface
 Open a terminal in the root project folder.
 
 Launch a local web server (required for web browsers to load .wasm binaries):
-
+'''
 Bash
 # Using Python 3
 python -m http.server 8000
@@ -108,5 +108,7 @@ Open your web browser and go to:
 
 Plaintext
 http://localhost:8000
+'''
+## Screenshot
 
-Digital_logical_circuit.png
+![Digital Logic Circuit](Digital_logical_circuit.png)
