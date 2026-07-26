@@ -48,7 +48,7 @@ The simulation engine tracks its entire system state in a dedicated struct (`Cir
 ## 💻 Code Overview & Highlights
 
 ### 1. Header Inclusion
-```c
+#```c
 #include <stdint.h>
 Provides exact-width standard integer types, ensuring cross-platform behavior across standard terminal and WebAssembly environments.
 
@@ -109,4 +109,8 @@ Open your web browser and go to:
 Plaintext
 http://localhost:8000
 
-![Project Screenshot](images/Digital_logical_circuit.png)
+## Project Screenshots
+<p align="center">
+  <b>Image </b><br><br>
+  <img src="Digital_logical_circuit.jpeg" width="300"/>
+</p>
