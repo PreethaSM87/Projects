@@ -109,4 +109,4 @@ Open your web browser and go to:
 Plaintext
 http://localhost:8000
 
-
+Digital Logical Circuits/Digital_logical_circuit.png
