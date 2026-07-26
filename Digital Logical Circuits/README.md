@@ -108,7 +108,7 @@ Open your web browser and go to:
 
 Plaintext
 http://localhost:8000
-
+```
 ## Project Screenshots
 <p align="center">
   <b>Image </b><br><br>
