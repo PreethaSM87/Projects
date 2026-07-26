@@ -112,5 +112,5 @@ http://localhost:8000
 ## Project Screenshots
 <p align="center">
   <b>Image </b><br><br>
-  <img src="Digital_logical_circuit.jpeg" width="300"/>
+  <img src="Digital_logical_circuit.jpeg" width="1000"/>
 </p>
